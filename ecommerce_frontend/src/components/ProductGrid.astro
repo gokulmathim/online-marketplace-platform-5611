@@ -1,0 +1,108 @@
+---
+import type { Product } from "../lib/types";
+---
+<section>
+  <div class="flex items-center justify-between mb-3">
+    <h2 class="m-0">Products</h2>
+    <div id="result-meta" class="text-muted"></div>
+  </div>
+  <div id="product-grid" class="grid"></div>
+  <div id="pagination" class="flex items-center justify-between mt-4">
+    <button id="prev" class="button ghost">Previous</button>
+    <button id="next" class="button ghost">Next</button>
+  </div>
+</section>
+
+<script>
+  import type { Product } from "../lib/types";
+  import { searchProducts } from "../lib/api";
+  import { addToCart } from "../lib/cart";
+
+  type SearchResult = { items: Product[]; total: number; page: number; pageSize: number };
+
+  function cardHTML(p: Product): string {
+    const price = `$${p.price.toFixed(2)}`;
+    const img = p.imageUrl || "https://placehold.co/600x600";
+    return `
+      <article class="card" style="overflow:hidden;display:flex;flex-direction:column;">
+        <a href="/products/${p.id}" style="text-decoration:none;color:inherit;">
+          <div style="aspect-ratio: 1/1; background:#f3f4f6; overflow:hidden;">
+            <img src="${img}" alt="${p.name}" style="width:100%;height:100%;object-fit:cover;" loading="lazy" />
+          </div>
+          <div style="padding:12px;">
+            <h3 style="margin:0;font-size:16px;line-height:1.3;">${p.name}</h3>
+            <p class="text-muted mt-2" style="font-size:14px;">${price}</p>
+          </div>
+        </a>
+        <div style="padding:12px;padding-top:0;display:flex;gap:8px;">
+          <button class="button flex-1" data-add="${p.id}">Add to cart</button>
+          <a href="/products/${p.id}" class="button ghost">Details</a>
+        </div>
+      </article>
+    `;
+  }
+
+  async function loadAndRender() {
+    const url = new URL(location.href);
+    const q = url.searchParams.get("q") || undefined;
+    const category = url.searchParams.get("category") || undefined;
+    const page = Number(url.searchParams.get("page") || "1");
+    const pageSize = 12;
+
+    const res: SearchResult = await searchProducts({ q, category, page, pageSize });
+    render(res);
+  }
+
+  function render(res: SearchResult) {
+    const grid = document.getElementById("product-grid");
+    const meta = document.getElementById("result-meta");
+    const prev = document.getElementById("prev") as HTMLButtonElement | null;
+    const next = document.getElementById("next") as HTMLButtonElement | null;
+    if (!grid || !prev || !next || !meta) return;
+
+    meta.textContent = `${res.total} results · Page ${res.page}`;
+    grid.innerHTML = "";
+
+    if (!res.items.length) {
+      const empty = document.createElement("div");
+      empty.className = "card p-4";
+      empty.textContent = "No products found.";
+      grid.appendChild(empty);
+      return;
+    }
+
+    const frag = document.createDocumentFragment();
+    res.items.forEach((product) => {
+      const wrapper = document.createElement("div");
+      wrapper.style.gridColumn = "span 3";
+      wrapper.innerHTML = cardHTML(product);
+      frag.appendChild(wrapper);
+    });
+    grid.appendChild(frag);
+
+    // Delegate click for add-to-cart buttons
+    grid.querySelectorAll("[data-add]").forEach((el) => {
+      el.addEventListener("click", () => {
+        const id = (el as HTMLElement).getAttribute("data-add")!;
+        const product = res.items.find((p) => p.id === id);
+        if (product) addToCart(product, 1);
+      });
+    });
+
+    prev.disabled = res.page <= 1;
+    const maxPage = Math.ceil(res.total / res.pageSize);
+    next.disabled = res.page >= maxPage;
+
+    prev.onclick = () => updatePage(res.page - 1);
+    next.onclick = () => updatePage(res.page + 1);
+  }
+
+  function updatePage(page: number) {
+    const url = new URL(location.href);
+    if (page <= 1) url.searchParams.delete("page");
+    else url.searchParams.set("page", String(page));
+    location.href = `/${url.search}`;
+  }
+
+  loadAndRender();
+</script>

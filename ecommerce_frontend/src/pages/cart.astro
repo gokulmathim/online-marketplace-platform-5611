@@ -1,0 +1,75 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { getCart, updateQuantity, removeFromCart, cartTotal, clearCart } from "../lib/cart";
+
+const items = getCart();
+---
+
+<Layout>
+  <section class="container">
+    <h1 class="m-0">Cart</h1>
+    <div class="mt-4">
+      {items.length === 0 ? (
+        <div class="card p-4">Your cart is empty.</div>
+      ) : (
+        <div class="card p-4">
+          {items.map((ci) => (
+            <div class="flex items-center justify-between" style="border-bottom:1px solid var(--border);padding:10px 0;">
+              <div class="flex items-center" style="gap:12px;">
+                <img src={ci.product.imageUrl || "https://placehold.co/96"} alt={ci.product.name} style="width:56px;height:56px;border-radius:8px;object-fit:cover;" />
+                <div>
+                  <strong>{ci.product.name}</strong>
+                  <div class="text-muted">${ci.product.price.toFixed(2)}</div>
+                </div>
+              </div>
+              <div class="flex items-center" style="gap:8px;">
+                <button class="button ghost" data-dec={ci.product.id}>-</button>
+                <span>{ci.quantity}</span>
+                <button class="button ghost" data-inc={ci.product.id}>+</button>
+                <button class="button ghost" data-remove={ci.product.id}>Remove</button>
+              </div>
+            </div>
+          ))}
+          <div class="flex justify-between mt-4">
+            <strong>Subtotal</strong>
+            <strong id="subtotal">${cartTotal().toFixed(2)}</strong>
+          </div>
+          <div class="mt-4" style="display:flex;gap:8px;justify-content:flex-end;">
+            <button id="clear" class="button ghost">Clear</button>
+            <a href="/checkout" class="button">Checkout</a>
+          </div>
+        </div>
+      )}
+    </div>
+  </section>
+</Layout>
+
+<script>
+  import { getCart, updateQuantity, removeFromCart, cartTotal, clearCart } from "../lib/cart";
+  function bind() {
+    document.querySelectorAll("[data-inc]").forEach((b) => b.addEventListener("click", () => {
+      const id = (b as HTMLElement).getAttribute("data-inc")!;
+      const items = getCart();
+      const found = items.find((x) => x.product.id === id);
+      if (found) updateQuantity(id, found.quantity + 1);
+      location.reload();
+    }));
+    document.querySelectorAll("[data-dec]").forEach((b) => b.addEventListener("click", () => {
+      const id = (b as HTMLElement).getAttribute("data-dec")!;
+      const items = getCart();
+      const found = items.find((x) => x.product.id === id);
+      if (found) updateQuantity(id, found.quantity - 1);
+      location.reload();
+    }));
+    document.querySelectorAll("[data-remove]").forEach((b) => b.addEventListener("click", () => {
+      const id = (b as HTMLElement).getAttribute("data-remove")!;
+      removeFromCart(id);
+      location.reload();
+    }));
+    document.getElementById("clear")?.addEventListener("click", () => {
+      clearCart();
+      location.reload();
+    });
+  }
+  bind();
+</script>

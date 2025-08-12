@@ -4,6 +4,11 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 export default [
+  // Ignore generated/build artifacts
+  {
+    ignores: ['**/.astro/**', 'dist/**', '**/node_modules/**'],
+  },
+
   js.configs.recommended,
 
   // TypeScript support

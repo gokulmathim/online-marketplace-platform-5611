@@ -1,0 +1,104 @@
+---
+---
+<div id="cart-backdrop" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,0.35);backdrop-filter:saturate(120%) blur(2px);z-index:50;"></div>
+<aside id="cart-drawer" class="card hidden" style="position:fixed;top:0;right:0;height:100vh;width:380px;max-width:100vw;border-left:1px solid var(--border);border-radius:0;z-index:51;background:#fff;display:flex;flex-direction:column;">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border);">
+    <strong>Your cart</strong>
+    <button id="cart-close" class="button ghost">Close</button>
+  </div>
+  <div id="cart-items" style="padding:12px;overflow:auto;flex:1;"></div>
+  <div style="padding:12px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:8px;">
+    <div class="flex justify-between">
+      <span class="text-muted">Subtotal</span>
+      <strong id="cart-subtotal">$0.00</strong>
+    </div>
+    <a href="/checkout" class="button">Checkout</a>
+  </div>
+</aside>
+
+<script>
+  import { getCart, updateQuantity, removeFromCart, cartTotal } from "../lib/cart";
+
+  const drawer = document.getElementById("cart-drawer");
+  const backdrop = document.getElementById("cart-backdrop");
+  const closeBtn = document.getElementById("cart-close");
+  const itemsEl = document.getElementById("cart-items");
+  const subtotalEl = document.getElementById("cart-subtotal");
+
+  function show() {
+    drawer?.classList.remove("hidden");
+    backdrop?.classList.remove("hidden");
+    render();
+  }
+  function hide() {
+    drawer?.classList.add("hidden");
+    backdrop?.classList.add("hidden");
+  }
+
+  function render() {
+    if (!itemsEl || !subtotalEl) return;
+    const items = getCart();
+    itemsEl.innerHTML = "";
+    if (!items.length) {
+      const empty = document.createElement("div");
+      empty.className = "card p-4";
+      empty.textContent = "Your cart is empty.";
+      itemsEl.appendChild(empty);
+    } else {
+      items.forEach((ci) => {
+        const row = document.createElement("div");
+        row.className = "card p-3";
+        row.style.display = "grid";
+        row.style.gridTemplateColumns = "64px 1fr auto";
+        row.style.gap = "12px";
+        row.style.marginBottom = "8px";
+        row.innerHTML = `
+          <img src="${ci.product.imageUrl || "https://placehold.co/128"}" alt="${ci.product.name}" style="width:64px;height:64px;border-radius:8px;object-fit:cover;"/>
+          <div style="display:flex;flex-direction:column;gap:4px;">
+            <strong>${ci.product.name}</strong>
+            <span class="text-muted">$${ci.product.price.toFixed(2)}</span>
+            <div class="flex items-center" style="gap:8px;">
+              <button class="button ghost" data-dec="${ci.product.id}">-</button>
+              <span>${ci.quantity}</span>
+              <button class="button ghost" data-inc="${ci.product.id}">+</button>
+            </div>
+          </div>
+          <button class="button ghost" data-remove="${ci.product.id}">Remove</button>
+        `;
+        itemsEl.appendChild(row);
+      });
+    }
+    subtotalEl.textContent = `$${cartTotal().toFixed(2)}`;
+    bindRowActions();
+  }
+
+  function bindRowActions() {
+    itemsEl?.querySelectorAll("[data-inc]").forEach((b) =>
+      b.addEventListener("click", () => {
+        const id = (b as HTMLElement).getAttribute("data-inc")!;
+        const items = getCart();
+        const found = items.find((x) => x.product.id === id);
+        if (found) updateQuantity(id, found.quantity + 1);
+      })
+    );
+    itemsEl?.querySelectorAll("[data-dec]").forEach((b) =>
+      b.addEventListener("click", () => {
+        const id = (b as HTMLElement).getAttribute("data-dec")!;
+        const items = getCart();
+        const found = items.find((x) => x.product.id === id);
+        if (found) updateQuantity(id, found.quantity - 1);
+      })
+    );
+    itemsEl?.querySelectorAll("[data-remove]").forEach((b) =>
+      b.addEventListener("click", () => {
+        const id = (b as HTMLElement).getAttribute("data-remove")!;
+        removeFromCart(id);
+      })
+    );
+  }
+
+  window.addEventListener("cart:toggle", () => (drawer?.classList.contains("hidden") ? show() : hide()));
+  window.addEventListener("cart:updated", render as any);
+  backdrop?.addEventListener("click", hide);
+  closeBtn?.addEventListener("click", hide);
+</script>

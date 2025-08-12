@@ -1,0 +1,97 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { getCart, cartTotal, clearCart } from "../lib/cart";
+import { checkout } from "../lib/api";
+
+const items = getCart();
+const total = cartTotal();
+---
+
+<Layout>
+  <section class="container">
+    <h1 class="m-0">Checkout</h1>
+    <p class="text-muted mt-2">Securely complete your purchase.</p>
+
+    <div class="mt-4" style="display:grid;grid-template-columns:2fr 1fr;gap:16px;">
+      <form id="payment-form" class="card p-4">
+        <h3 class="m-0">Payment details</h3>
+        <div class="grid mt-4" style="grid-template-columns: repeat(12, 1fr); gap: 12px;">
+          <div style="grid-column: span 12;">
+            <label>Cardholder name<input name="name" class="input mt-2" required /></label>
+          </div>
+          <div style="grid-column: span 12;">
+            <label>Card number<input name="number" inputmode="numeric" class="input mt-2" placeholder="4242 4242 4242 4242" required /></label>
+          </div>
+          <div style="grid-column: span 6;">
+            <label>Expiry<input name="expiry" class="input mt-2" placeholder="MM/YY" required /></label>
+          </div>
+          <div style="grid-column: span 6;">
+            <label>CVC<input name="cvc" class="input mt-2" placeholder="CVC" required /></label>
+          </div>
+          <div style="grid-column: span 12;">
+            <label>Billing address (optional)<input name="address" class="input mt-2" /></label>
+          </div>
+        </div>
+        <button class="button mt-4" type="submit">Pay ${total.toFixed(2)}</button>
+        <div id="pay-msg" class="text-muted mt-3"></div>
+      </form>
+
+      <aside class="card p-4">
+        <h3 class="m-0">Order summary</h3>
+        <div id="sum-items" class="mt-3" style="display:flex;flex-direction:column;gap:8px;"></div>
+        <div class="flex justify-between mt-4">
+          <span class="text-muted">Subtotal</span>
+          <strong>${total.toFixed(2)}</strong>
+        </div>
+      </aside>
+    </div>
+  </section>
+</Layout>
+
+<script>
+  import { getCart, clearCart } from "../lib/cart";
+  import { checkout } from "../lib/api";
+
+  const summary = document.getElementById("sum-items");
+  const form = document.getElementById("payment-form") as HTMLFormElement | null;
+  const msg = document.getElementById("pay-msg");
+
+  function renderSummary() {
+    const items = getCart();
+    if (!summary) return;
+    summary.innerHTML = "";
+    if (!items.length) {
+      summary.textContent = "Your cart is empty.";
+      return;
+    }
+    items.forEach((ci) => {
+      const row = document.createElement("div");
+      row.className = "flex justify-between";
+      row.innerHTML = `<span>${ci.product.name} × ${ci.quantity}</span><strong>$${(ci.product.price * ci.quantity).toFixed(2)}</strong>`;
+      summary.appendChild(row);
+    });
+  }
+
+  renderSummary();
+
+  form?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const f = new FormData(form);
+    const payment = {
+      cardNumber: String(f.get("number") || ""),
+      expiry: String(f.get("expiry") || ""),
+      cvc: String(f.get("cvc") || ""),
+      name: String(f.get("name") || ""),
+      address: String(f.get("address") || ""),
+    };
+    const items = getCart().map((ci) => ({ productId: ci.product.id, quantity: ci.quantity }));
+    const res = await checkout({ items, payment });
+    if (res?.orderId) {
+      if (msg) msg.textContent = `Payment successful. Order ${res.orderId} created.`;
+      clearCart();
+      setTimeout(() => (location.href = "/orders"), 600);
+    } else {
+      if (msg) msg.textContent = "Payment failed. Please try again.";
+    }
+  });
+</script>
