@@ -3,9 +3,11 @@
  * All calls are routed through safeFetch which protects the UI from failing on network errors.
  */
 
-import type { AuthResponse, Category, Order, Product } from "./types";
+import type { AuthResponse, Category, Order, Product, ShippingAddress, ShippingOption } from "./types";
 
 const API_BASE = (import.meta.env.PUBLIC_API_BASE_URL || "").replace(/\/+$/, "");
+/** Optional dedicated shipping rate API URL if backend provides a separate endpoint */
+const RATE_API = (import.meta.env.PUBLIC_SHIPPING_RATE_API_URL || "").replace(/\/+$/, "");
 
 /** Emit a console warning in development when API_BASE isn't configured. */
 function warnIfNoApi() {
@@ -109,6 +111,93 @@ const Demo = {
   orders: [] as Order[],
 };
 
+/**
+ * Compute a simple demo shipping options list when real-time rates are unavailable.
+ * Uses subtotal heuristics so the UX remains realistic.
+ */
+function demoShippingOptions(subtotal: number): ShippingOption[] {
+  const base = Math.max(4.99, Math.round((subtotal * 0.08 + Number.EPSILON) * 100) / 100);
+  const expedited = Math.max(9.99, Math.round((subtotal * 0.12 + Number.EPSILON) * 100) / 100);
+  const overnight = Math.max(19.99, Math.round((subtotal * 0.2 + Number.EPSILON) * 100) / 100);
+
+  return [
+    {
+      id: "standard",
+      carrier: "MockPost",
+      service: "Ground",
+      label: "Standard (5-7 business days)",
+      estimatedDays: "5-7",
+      amount: Number(base.toFixed(2)),
+      currency: "USD",
+      meta: { demo: true },
+    },
+    {
+      id: "expedited",
+      carrier: "MockPost",
+      service: "Expedited",
+      label: "Expedited (2-3 business days)",
+      estimatedDays: "2-3",
+      amount: Number(expedited.toFixed(2)),
+      currency: "USD",
+      meta: { demo: true },
+    },
+    {
+      id: "overnight",
+      carrier: "MockPost",
+      service: "Overnight",
+      label: "Overnight (1 business day)",
+      estimatedDays: "1",
+      amount: Number(overnight.toFixed(2)),
+      currency: "USD",
+      meta: { demo: true },
+    },
+  ];
+}
+
+// PUBLIC_INTERFACE
+export async function getShippingRates(payload: {
+  destination: ShippingAddress;
+  cart: { productId: string; quantity: number; price?: number }[];
+  /** Optional subtotal to improve fallback accuracy */
+  subtotal?: number;
+}): Promise<ShippingOption[]> {
+  /**
+   * Fetch available shipping options for the given destination and cart.
+   * Attempts, in order:
+   *  1) Dedicated rate API (PUBLIC_SHIPPING_RATE_API_URL) if provided;
+   *  2) Backend endpoint at /shipping/rates on PUBLIC_API_BASE_URL;
+   *  3) Demo fallback using subtotal heuristics (no network).
+   */
+  const subtotal =
+    payload.subtotal ??
+    payload.cart.reduce((sum, it) => sum + (it.price ?? 0) * it.quantity, 0);
+
+  // Prefer a dedicated shipping rates API URL if configured
+  if (RATE_API) {
+    try {
+      const res = await fetch(`${RATE_API}/rates`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        const data = (await res.json()) as ShippingOption[];
+        if (Array.isArray(data) && data.length) return data;
+      }
+    } catch (err) {
+      console.warn("[API] Rate API failed, falling back:", err);
+    }
+  }
+
+  // Try backend integrated endpoint under PUBLIC_API_BASE_URL
+  const backendOptions = await safeFetch<ShippingOption[]>(
+    "/shipping/rates",
+    { method: "POST", body: JSON.stringify(payload) },
+    demoShippingOptions(subtotal)
+  );
+  return backendOptions;
+}
+
 // PUBLIC_INTERFACE
 export async function getCategories(): Promise<Category[]> {
   /** Get all product categories. */
@@ -200,8 +289,16 @@ export async function getOrders(): Promise<Order[]> {
 export async function checkout(payload: {
   items: { productId: string; quantity: number }[];
   payment: { cardNumber: string; expiry: string; cvc: string; name: string; address?: string };
+  /** Selected shipping details to be used for order fulfillment */
+  shipping?: {
+    address: ShippingAddress;
+    option: ShippingOption;
+  };
 }): Promise<{ orderId: string } | null> {
-  /** Create an order from cart items and payment details. Returns order ID on success. */
+  /**
+   * Create an order from cart items and payment/shipping details.
+   * Returns order ID on success. If backend is unavailable, returns a demo order ID.
+   */
   const body = JSON.stringify(payload);
   const demo = { orderId: `demo_${Math.random().toString(36).slice(2, 10)}` };
   return safeFetch<{ orderId: string } | null>(

@@ -25,6 +25,10 @@ Tech:
 2) Configure environment:
    Copy .env.example to .env and set:
    - PUBLIC_API_BASE_URL=https://your-backend-api.example.com
+   - PUBLIC_SHIPPING_RATE_API_URL=https://your-shipping-rate-service.example.com  # optional; if absent, demo rates are used
+   - PUBLIC_DEFAULT_SHIPPING_ORIGIN_COUNTRY=US                                   # optional; used by backend rate calculation
+   - PUBLIC_DEFAULT_SHIPPING_ORIGIN_POSTAL=10001                                  # optional; used by backend rate calculation
+   - PUBLIC_ENABLE_SHIPPING_DEMO=true                                             # optional; enables fallback demo rates in UI
 
 3) Run locally:
    npm run dev
@@ -42,9 +46,36 @@ Expected endpoints (typical):
 - POST /auth/login { email, password }
 - POST /auth/register { name, email, password }
 - GET /orders (auth required)
-- POST /orders/checkout (auth required) { items: [{productId, quantity}], payment: { ... } }
+- POST /orders/checkout (auth required) {
+    items: [{ productId, quantity }],
+    payment: { ... },
+    shipping: {
+      address: { line1, line2?, city, state?, postalCode, country, name?, phone? },
+      option: { id, carrier, service, label, estimatedDays, amount, currency?, meta? }
+    }
+  }
+- POST /shipping/rates { destination, cart, subtotal? } -> ShippingOption[]
 
-Auth token must be returned as { token, user } and will be sent with Authorization: Bearer <token> header.
+Shipping rate integration:
+- If PUBLIC_SHIPPING_RATE_API_URL is set, the UI will call POST {PUBLIC_SHIPPING_RATE_API_URL}/rates with the same payload as /shipping/rates.
+- If neither is available, the UI gracefully falls back to demo rate calculation (no external calls, for local development).
+
+Security note:
+- Do NOT expose courier provider secret keys in the frontend. Integrate with couriers (Shippo, ShipEngine, EasyPost, etc.) on your backend and expose a single rates endpoint to the UI.
+
+## Shipping UI and real-time rates
+
+- The Checkout page now includes:
+  - Shipping address form
+  - "Get shipping rates" action to fetch real-time rates (or demo fallback)
+  - A selectable list of shipping options (standard/expedited/overnight by default in demo)
+  - Order summary updates (Subtotal, Shipping, Total) and the Pay button amount updates to include shipping.
+
+- Backend integration options:
+  - Implement POST /shipping/rates on your backend to aggregate courier quotes (Shippo, ShipEngine, EasyPost, etc.) and return an array of ShippingOption.
+  - Alternatively, set PUBLIC_SHIPPING_RATE_API_URL to a server-side service you control that returns rates with the same payload/shape.
+
+- The frontend never uses courier provider secret keys directly.
 
 ## Notes
 
