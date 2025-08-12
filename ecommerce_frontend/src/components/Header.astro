@@ -1,0 +1,95 @@
+---
+---
+<header style="position:sticky;top:0;background:#fff;border-bottom:1px solid var(--border);z-index:20;">
+  <div class="container" style="display:flex;align-items:center;height:var(--header-height);gap:16px;">
+    <a href="/" class="brand" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;">
+      <div class="logo" style="width:36px;height:36px;border-radius:10px;background:var(--color-primary);display:grid;place-items:center;color:#fff;font-weight:800;">M</div>
+      <strong style="letter-spacing:0.3px;">Marketplace</strong>
+    </a>
+    <form id="search-form" class="flex flex-1" role="search" style="gap:8px;">
+      <input id="search-input" type="search" class="input" placeholder="Search products..." aria-label="Search products" />
+      <button class="button" type="submit" aria-label="Search">Search</button>
+    </form>
+    <nav class="actions" style="display:flex;align-items:center;gap:12px;">
+      <a href="/orders" class="button ghost" id="orders-link">Orders</a>
+      <button id="auth-button" class="button secondary">Sign in</button>
+      <button id="cart-button" class="button accent" aria-label="Open cart">
+        Cart <span id="cart-count" style="margin-left:8px;font-weight:800;">0</span>
+      </button>
+    </nav>
+  </div>
+</header>
+
+<script>
+  import { cartCount } from "../lib/cart";
+  import { getCurrentUser, clearAuth } from "../lib/auth";
+
+  function updateCartCount() {
+    const el = document.getElementById("cart-count");
+    if (el) el.textContent = String(cartCount());
+  }
+
+  function initSearch() {
+    const form = document.getElementById("search-form");
+    const input = document.getElementById("search-input") as HTMLInputElement | null;
+    if (!form || !input) return;
+    const params = new URLSearchParams(location.search);
+    if (params.get("q")) input.value = params.get("q")!;
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const q = (input.value || "").trim();
+      const url = new URL(location.href);
+      if (q) url.searchParams.set("q", q);
+      else url.searchParams.delete("q");
+      // navigate
+      location.href = `/${url.search}`;
+    });
+  }
+
+  function initCartButton() {
+    const btn = document.getElementById("cart-button");
+    if (!btn) return;
+    btn.addEventListener("click", () => {
+      window.dispatchEvent(new CustomEvent("cart:toggle"));
+    });
+  }
+
+  function initAuthButton() {
+    const btn = document.getElementById("auth-button");
+    const orders = document.getElementById("orders-link");
+    if (!btn) return;
+
+    const syncUi = () => {
+      const user = getCurrentUser();
+      if (user) {
+        btn.textContent = "Sign out";
+        btn.classList.remove("secondary");
+        btn.classList.add("ghost");
+        orders?.classList.remove("hidden");
+      } else {
+        btn.textContent = "Sign in";
+        btn.classList.add("secondary");
+        btn.classList.remove("ghost");
+        orders?.classList.add("hidden");
+      }
+    };
+
+    syncUi();
+    window.addEventListener("auth:changed", syncUi as any);
+
+    btn.addEventListener("click", () => {
+      const user = getCurrentUser();
+      if (user) {
+        clearAuth();
+      } else {
+        window.dispatchEvent(new CustomEvent("auth:open"));
+      }
+    });
+  }
+
+  updateCartCount();
+  window.addEventListener("cart:updated", updateCartCount as any);
+  initSearch();
+  initCartButton();
+  initAuthButton();
+</script>

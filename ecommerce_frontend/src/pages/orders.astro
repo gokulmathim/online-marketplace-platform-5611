@@ -1,0 +1,57 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { getCurrentUser } from "../lib/auth";
+import { getOrders } from "../lib/api";
+
+const user = getCurrentUser();
+const orders = user ? await getOrders() : [];
+---
+
+<Layout>
+  <section class="container">
+    <h1 class="m-0">Your orders</h1>
+    {!user && (
+      <div class="card p-4 mt-4">
+        <p>Please sign in to view your orders.</p>
+        <button class="button mt-2" id="open-auth">Sign in</button>
+      </div>
+    )}
+    {user && (
+      <div class="mt-4" id="orders-list" style="display:flex;flex-direction:column;gap:12px;">
+        {orders.length === 0 ? (
+          <div class="card p-4">No orders yet.</div>
+        ) : (
+          orders.map((o) => (
+            <div class="card p-4">
+              <div class="flex justify-between">
+                <strong>Order #{o.id}</strong>
+                <span class="text-muted">{new Date(o.createdAt).toLocaleString()}</span>
+              </div>
+              <div class="mt-3" style="display:flex;flex-direction:column;gap:6px;">
+                {o.items.map((it) => (
+                  <div class="flex justify-between">
+                    <span>{it.name} × {it.quantity}</span>
+                    <span>${(it.price * it.quantity).toFixed(2)}</span>
+                  </div>
+                ))}
+              </div>
+              <div class="flex justify-between mt-3">
+                <span class="text-muted">Status: {o.status}</span>
+                <strong>Total: ${o.total.toFixed(2)}</strong>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    )}
+  </section>
+</Layout>
+
+{!user && (
+  <script>
+    const btn = document.getElementById("open-auth");
+    btn?.addEventListener("click", () => {
+      window.dispatchEvent(new CustomEvent("auth:open"));
+    });
+  </script>
+)}

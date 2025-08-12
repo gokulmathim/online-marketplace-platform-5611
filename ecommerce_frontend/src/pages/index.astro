@@ -1,0 +1,20 @@
+---
+import Layout from "../layouts/Layout.astro";
+import ProductGrid from "../components/ProductGrid.astro";
+---
+
+<Layout>
+  <section class="container">
+    <div class="card p-6" style="display:flex;align-items:center;justify-content:space-between;gap:16px;">
+      <div>
+        <h1 class="m-0">Find your next favorite thing</h1>
+        <p class="text-muted mt-2">Modern, minimal, and delightful shopping experience.</p>
+      </div>
+      <a href="#products" class="button accent">Shop now</a>
+    </div>
+
+    <div id="products" class="mt-6">
+      <ProductGrid />
+    </div>
+  </section>
+</Layout>

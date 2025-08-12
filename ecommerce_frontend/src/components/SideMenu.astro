@@ -1,0 +1,54 @@
+---
+---
+<aside class="card p-4">
+  <h3 class="m-0">Categories</h3>
+  <p class="text-muted mt-2">Browse by category</p>
+  <ul id="categories" style="list-style:none;padding:0;margin:12px 0 0;display:flex;flex-direction:column;gap:6px;"></ul>
+</aside>
+
+<script>
+  import { getCategories } from "../lib/api";
+
+  function renderCategories(items: Array<{ id: string; name: string; slug: string }>) {
+    const ul = document.getElementById("categories");
+    if (!ul) return;
+    const params = new URLSearchParams(location.search);
+    const active = params.get("category") || "all";
+
+    ul.innerHTML = "";
+    const makeLink = (id: string, name: string) => {
+      const li = document.createElement("li");
+      const a = document.createElement("a");
+      a.textContent = name;
+      a.href = "#";
+      a.style.textDecoration = "none";
+      a.style.color = "inherit";
+      a.className = "button ghost";
+      a.style.display = "block";
+      a.style.textAlign = "left";
+      a.addEventListener("click", (e) => {
+        e.preventDefault();
+        const url = new URL(location.href);
+        if (id && id !== "all") url.searchParams.set("category", id);
+        else url.searchParams.delete("category");
+        // reset pagination on category change
+        url.searchParams.delete("page");
+        location.href = `/${url.search}`;
+      });
+      if (active === id) {
+        a.style.background = "rgba(0,82,204,0.09)";
+        a.style.color = "var(--color-primary)";
+      }
+      li.appendChild(a);
+      return li;
+    };
+
+    ul.appendChild(makeLink("all", "All"));
+    items.forEach((c) => ul.appendChild(makeLink(c.id, c.name)));
+  }
+
+  (async () => {
+    const cats = await getCategories();
+    renderCategories(cats);
+  })();
+</script>

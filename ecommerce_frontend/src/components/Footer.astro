@@ -1,0 +1,20 @@
+---
+---
+<footer style="border-top:1px solid var(--border);margin-top:16px;background:#fff;">
+  <div class="container" style="display:flex;gap:16px;align-items:center;justify-content:space-between;padding:24px 0;">
+    <div style="display:flex;gap:12px;align-items:center;">
+      <div style="width:28px;height:28px;border-radius:8px;background:var(--color-secondary);"></div>
+      <span class="text-muted">© <span id="year"></span> Marketplace</span>
+    </div>
+    <nav style="display:flex;gap:12px;">
+      <a href="/" class="button link">Home</a>
+      <a href="/orders" class="button link">Orders</a>
+      <a href="/checkout" class="button link">Checkout</a>
+    </nav>
+  </div>
+</footer>
+
+<script>
+  const el = document.getElementById("year");
+  if (el) el.textContent = String(new Date().getFullYear());
+</script>
